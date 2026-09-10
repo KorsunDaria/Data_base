@@ -1,0 +1,37 @@
+1.
+
+select street_address 
+from locations 
+where city='Tokyo' 
+order by street_address;
+
+2.
+
+select last_name, count(*)
+from  employees
+group by last_name
+having count(*) > 1
+order by count(*), last_name;
+
+3.
+
+select distinct job_id, department_id
+from  employees
+where department_id is not null
+order by job_id, department_id;
+
+4.
+
+select employee_id, max(start_date)
+from job_history
+group by employee_id
+having count(*) > 1
+order by employee_id
+
+
+5.
+
+select employee_id, last_name, first_name
+from  employees
+where manager_id is null
+order by employee_id;
