@@ -460,7 +460,7 @@ from employees e
 where e.job_id = 
     (select q.job_id 
      from employees q 
-     where q.employee_id='100')
+     where q.employee_id=100)
 ```
 
 53. Найти отделы, которых нет среди отделов с локацией в США (`NOT IN`).
@@ -472,6 +472,15 @@ from departments d
 join locations l on d.location_id=l.location_id
 join countries c on l.country_id = c.country_id
 where c.country_name<>'USA'
+
+select d.department_id, d.department_name
+from departments d
+where d.department_id not in
+    (select d2.department_id
+     from departments d2
+     join locations l on d2.location_id = l.location_id
+     where l.country_id = 'US')
+order by d.department_id;
 ```
 
 54. Вывести сотрудников, чья зарплата равна максимальной зарплате в компании.
@@ -487,7 +496,10 @@ where e.salary=(select max(salary) from employees)
     **Вывести:** фамилия, зарплата, разница. **Сортировать:** разница.
 
 ```SQL
-
+select e.last_name, e.salary, 
+abs(e.salary-(select max(e2.salary) from employees e2)) as diff
+from employees e
+order by diff 
 ```
 
 56. Найти сотрудников, которые одновременно являются чьим-либо менеджером (`employee_id` встречается как `manager_id`).

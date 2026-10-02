@@ -1,0 +1,15 @@
+(SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) AS median_value
+FROM employees)
+
+EXTRACT(YEAR FROM age(max(e.hire_date),min(e.hire_date))) * 12 
+     + EXTRACT(MONTH FROM age(max(e.hire_date),min(e.hire_date))) as month
+
+
+10. Определить работника (работников), который эффективнее всех продвинулся по
+    карьерной лестнице. Под эффективностью будем понимать разницу максимальной
+    зарплаты на новой должности и минимальной на старой должности.
+    Вывести: код работника, его фамилию и имя, название отдела.
+    Сортировать: Код работника
+
+```SQL
+coalesce(sum(e.salary),0) 
