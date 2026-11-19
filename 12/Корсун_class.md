@@ -142,6 +142,10 @@ CREATE TABLE library.loan (
     CHECK (due_date >= issue_date),
     CHECK (return_date IS NULL OR return_date >= issue_date)
 );
+
+CREATE UNIQUE INDEX ux_loan_copy_on_hands
+ON library.loan (copy_id)
+WHERE return_date IS NULL;
 ```
 
 ## 4. Аптека
