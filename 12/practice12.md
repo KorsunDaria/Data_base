@@ -1,0 +1,670 @@
+-- Занятие 12: DDL-скрипты (PostgreSQL). Каждое задание в своей схеме.
+
+---------------------------------------------------------------
+-- 1. Больница
+---------------------------------------------------------------
+CREATE SCHEMA hospital;
+
+CREATE TABLE hospital.department (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE hospital.room (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    department_id INTEGER NOT NULL REFERENCES hospital.department(id),
+    number        VARCHAR(10) NOT NULL,
+    UNIQUE (department_id, number)
+);
+
+CREATE TABLE hospital.doctor (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    department_id    INTEGER NOT NULL REFERENCES hospital.department(id),
+    full_name        VARCHAR(150) NOT NULL,
+    address          VARCHAR(250) NOT NULL,
+    birth_date       DATE NOT NULL,
+    passport         VARCHAR(20) NOT NULL UNIQUE,
+    specialty        VARCHAR(100) NOT NULL,
+    experience_years INTEGER NOT NULL CHECK (experience_years >= 0)
+);
+
+CREATE TABLE hospital.patient (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name  VARCHAR(150) NOT NULL,
+    birth_date DATE NOT NULL,
+    policy     VARCHAR(20) NOT NULL UNIQUE
+);
+
+CREATE TABLE hospital.hospitalization (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    patient_id     INTEGER NOT NULL REFERENCES hospital.patient(id),
+    doctor_id      INTEGER NOT NULL REFERENCES hospital.doctor(id),
+    room_id        INTEGER NOT NULL REFERENCES hospital.room(id),
+    admission_date DATE NOT NULL,
+    discharge_date DATE,
+    diagnosis      VARCHAR(250) NOT NULL,
+    CHECK (discharge_date IS NULL OR discharge_date >= admission_date)
+);
+
+---------------------------------------------------------------
+-- 2. Повышение квалификации
+---------------------------------------------------------------
+CREATE SCHEMA training;
+
+CREATE TABLE training.employee (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE training.course (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name       VARCHAR(200) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date   DATE NOT NULL,
+    teacher_id INTEGER NOT NULL REFERENCES training.employee(id),
+    CHECK (end_date >= start_date)
+);
+
+CREATE TABLE training.enrollment (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES training.employee(id),
+    course_id   INTEGER NOT NULL REFERENCES training.course(id),
+    UNIQUE (employee_id, course_id)
+);
+
+CREATE TABLE training.certificate (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    enrollment_id INTEGER NOT NULL UNIQUE REFERENCES training.enrollment(id),
+    number        VARCHAR(30) NOT NULL UNIQUE,
+    issue_date    DATE NOT NULL
+);
+
+---------------------------------------------------------------
+-- 3. Библиотека
+---------------------------------------------------------------
+CREATE SCHEMA library;
+
+CREATE TABLE library.branch (
+    id     INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name   VARCHAR(100) NOT NULL,
+    street VARCHAR(100) NOT NULL,
+    house  VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE library.publisher (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(150) NOT NULL,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE library.genre (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE library.book (
+    isbn         VARCHAR(17) PRIMARY KEY,
+    title        VARCHAR(250) NOT NULL,
+    publisher_id INTEGER NOT NULL REFERENCES library.publisher(id),
+    cover_type   VARCHAR(20) NOT NULL
+                 CHECK (cover_type IN ('мягкая', 'твердая', 'суперобложка')),
+    year         INTEGER NOT NULL,
+    pages        INTEGER NOT NULL CHECK (pages > 0)
+);
+
+CREATE TABLE library.book_genre (
+    book_isbn VARCHAR(17) NOT NULL REFERENCES library.book(isbn),
+    genre_id  INTEGER NOT NULL REFERENCES library.genre(id),
+    PRIMARY KEY (book_isbn, genre_id)
+);
+
+CREATE TABLE library.copy (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    book_isbn        VARCHAR(17) NOT NULL REFERENCES library.book(isbn),
+    branch_id        INTEGER NOT NULL REFERENCES library.branch(id),
+    inventory_number VARCHAR(30) NOT NULL UNIQUE
+);
+
+CREATE TABLE library.reader (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name  VARCHAR(150) NOT NULL,
+    birth_year INTEGER NOT NULL,
+    address    VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE library.loan (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    copy_id     INTEGER NOT NULL REFERENCES library.copy(id),
+    reader_id   INTEGER NOT NULL REFERENCES library.reader(id),
+    issue_date  DATE NOT NULL,
+    due_date    DATE NOT NULL,
+    return_date DATE,
+    CHECK (due_date >= issue_date),
+    CHECK (return_date IS NULL OR return_date >= issue_date)
+);
+
+---------------------------------------------------------------
+-- 4. Аптека
+---------------------------------------------------------------
+CREATE SCHEMA pharmacy;
+
+CREATE TABLE pharmacy.manufacturer (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE pharmacy.drug_type (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE pharmacy.drug (
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name            VARCHAR(200) NOT NULL,
+    manufacturer_id INTEGER NOT NULL REFERENCES pharmacy.manufacturer(id),
+    type_id         INTEGER NOT NULL REFERENCES pharmacy.drug_type(id),
+    otc             BOOLEAN NOT NULL
+);
+
+CREATE TABLE pharmacy.price (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    drug_id    INTEGER NOT NULL REFERENCES pharmacy.drug(id),
+    value      NUMERIC(10, 2) NOT NULL CHECK (value >= 0),
+    date_from  DATE NOT NULL,
+    date_to    DATE,
+    CHECK (date_to IS NULL OR date_to >= date_from)
+);
+
+CREATE TABLE pharmacy.supplier (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(150) NOT NULL,
+    inn     VARCHAR(12) NOT NULL UNIQUE,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE pharmacy.branch (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE pharmacy.delivery (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    supplier_id INTEGER NOT NULL REFERENCES pharmacy.supplier(id),
+    branch_id   INTEGER NOT NULL REFERENCES pharmacy.branch(id),
+    date        DATE NOT NULL
+);
+
+CREATE TABLE pharmacy.delivery_item (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    delivery_id    INTEGER NOT NULL REFERENCES pharmacy.delivery(id),
+    drug_id        INTEGER NOT NULL REFERENCES pharmacy.drug(id),
+    quantity       INTEGER NOT NULL CHECK (quantity > 0),
+    purchase_price NUMERIC(10, 2) NOT NULL CHECK (purchase_price >= 0)
+);
+
+CREATE TABLE pharmacy.customer (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name VARCHAR(150) NOT NULL,
+    phone     VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE pharmacy.sale (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    branch_id   INTEGER NOT NULL REFERENCES pharmacy.branch(id),
+    customer_id INTEGER REFERENCES pharmacy.customer(id),
+    date        DATE NOT NULL
+);
+
+CREATE TABLE pharmacy.sale_item (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sale_id        INTEGER NOT NULL REFERENCES pharmacy.sale(id),
+    drug_id        INTEGER NOT NULL REFERENCES pharmacy.drug(id),
+    quantity       INTEGER NOT NULL CHECK (quantity > 0),
+    price          NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
+    prescription_number VARCHAR(30)
+);
+
+---------------------------------------------------------------
+-- 5. Предприятие
+---------------------------------------------------------------
+CREATE SCHEMA company;
+
+CREATE TABLE company.employee (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name        VARCHAR(150) NOT NULL,
+    birth_date       DATE NOT NULL,
+    experience_years INTEGER NOT NULL CHECK (experience_years >= 0)
+);
+
+CREATE TABLE company.education (
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id     INTEGER NOT NULL REFERENCES company.employee(id),
+    level           VARCHAR(50) NOT NULL,
+    institution     VARCHAR(200) NOT NULL,
+    graduation_year INTEGER NOT NULL,
+    specialty       VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE company.department (
+    number INTEGER PRIMARY KEY,
+    name   VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE company.position (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE company.assignment (
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id     INTEGER NOT NULL REFERENCES company.employee(id),
+    position_id     INTEGER NOT NULL REFERENCES company.position(id),
+    department_number INTEGER NOT NULL REFERENCES company.department(number),
+    salary          NUMERIC(12, 2) NOT NULL CHECK (salary >= 0),
+    order_number    VARCHAR(30) NOT NULL,
+    order_date      DATE NOT NULL,
+    start_date      DATE NOT NULL
+);
+
+CREATE TABLE company.vacation (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES company.employee(id),
+    start_date  DATE NOT NULL,
+    end_date    DATE NOT NULL,
+    CHECK (end_date >= start_date)
+);
+
+CREATE TABLE company.sick_leave (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES company.employee(id),
+    number      VARCHAR(30) NOT NULL UNIQUE
+);
+
+CREATE TABLE company.disability_period (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sick_leave_id INTEGER NOT NULL REFERENCES company.sick_leave(id),
+    start_date    DATE NOT NULL,
+    end_date      DATE NOT NULL,
+    CHECK (end_date >= start_date)
+);
+
+---------------------------------------------------------------
+-- 6. Пиццерия
+---------------------------------------------------------------
+CREATE SCHEMA pizzeria;
+
+CREATE TABLE pizzeria.branch (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE pizzeria.client (
+    id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name  VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL UNIQUE
+);
+
+CREATE TABLE pizzeria.courier (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    branch_id INTEGER NOT NULL REFERENCES pizzeria.branch(id),
+    full_name VARCHAR(150) NOT NULL,
+    phone     VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE pizzeria.pizza (
+    id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name  VARCHAR(100) NOT NULL UNIQUE,
+    price NUMERIC(10, 2) NOT NULL CHECK (price >= 0)
+);
+
+CREATE TABLE pizzeria.product (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    unit VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE pizzeria.pizza_composition (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    pizza_id   INTEGER NOT NULL REFERENCES pizzeria.pizza(id),
+    product_id INTEGER NOT NULL REFERENCES pizzeria.product(id),
+    quantity   NUMERIC(10, 3) NOT NULL CHECK (quantity > 0),
+    UNIQUE (pizza_id, product_id)
+);
+
+CREATE TABLE pizzeria."order" (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    client_id        INTEGER NOT NULL REFERENCES pizzeria.client(id),
+    branch_id        INTEGER NOT NULL REFERENCES pizzeria.branch(id),
+    courier_id       INTEGER REFERENCES pizzeria.courier(id),
+    created_at       TIMESTAMP NOT NULL,
+    order_method     VARCHAR(10) NOT NULL CHECK (order_method IN ('phone', 'internet')),
+    delivery_address VARCHAR(250) NOT NULL,
+    status           VARCHAR(30) NOT NULL
+);
+
+CREATE TABLE pizzeria.order_item (
+    id       INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES pizzeria."order"(id),
+    pizza_id INTEGER NOT NULL REFERENCES pizzeria.pizza(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0)
+);
+
+---------------------------------------------------------------
+-- 7. Курьерская доставка
+---------------------------------------------------------------
+CREATE SCHEMA delivery;
+
+CREATE TABLE delivery.city (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE delivery.branch (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    city_id INTEGER NOT NULL REFERENCES delivery.city(id),
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE delivery.client (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name VARCHAR(150) NOT NULL,
+    phone     VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE delivery.client_address (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    client_id INTEGER NOT NULL REFERENCES delivery.client(id),
+    city_id   INTEGER NOT NULL REFERENCES delivery.city(id),
+    address   VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE delivery.courier (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    branch_id INTEGER NOT NULL REFERENCES delivery.branch(id),
+    full_name VARCHAR(150) NOT NULL,
+    phone     VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE delivery.tariff (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    from_city_id INTEGER NOT NULL REFERENCES delivery.city(id),
+    to_city_id   INTEGER NOT NULL REFERENCES delivery.city(id),
+    cost      NUMERIC(10, 2) NOT NULL CHECK (cost >= 0),
+    UNIQUE (from_city_id, to_city_id)
+);
+
+CREATE TABLE delivery.shipment (
+    id                    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sender_id             INTEGER NOT NULL REFERENCES delivery.client(id),
+    recipient_id          INTEGER NOT NULL REFERENCES delivery.client(id),
+    tariff_id             INTEGER NOT NULL REFERENCES delivery.tariff(id),
+    pickup_branch_id      INTEGER REFERENCES delivery.branch(id),
+    pickup_address_id     INTEGER REFERENCES delivery.client_address(id),
+    pickup_courier_id     INTEGER REFERENCES delivery.courier(id),
+    dropoff_branch_id     INTEGER REFERENCES delivery.branch(id),
+    dropoff_address_id    INTEGER REFERENCES delivery.client_address(id),
+    dropoff_courier_id    INTEGER REFERENCES delivery.courier(id),
+    goods_description     VARCHAR(500) NOT NULL,
+    accepted_date         DATE NOT NULL,
+    delivery_cost         NUMERIC(10, 2) NOT NULL CHECK (delivery_cost >= 0),
+    courier_cost          NUMERIC(10, 2) NOT NULL CHECK (courier_cost >= 0),
+    status                VARCHAR(30) NOT NULL,
+    -- приём: либо в филиале, либо курьером по адресу
+    CHECK ((pickup_branch_id IS NOT NULL) <> (pickup_address_id IS NOT NULL)),
+    CHECK (pickup_address_id IS NULL OR pickup_courier_id IS NOT NULL),
+    -- выдача: либо в пункте выдачи, либо по адресу получателя
+    CHECK (dropoff_branch_id IS NULL OR dropoff_address_id IS NULL),
+    CHECK (dropoff_address_id IS NULL OR dropoff_courier_id IS NOT NULL)
+);
+
+---------------------------------------------------------------
+-- 8. Научная конференция
+---------------------------------------------------------------
+CREATE SCHEMA conference;
+
+CREATE TABLE conference.conference (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name       VARCHAR(200) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date   DATE NOT NULL,
+    CHECK (end_date >= start_date)
+);
+
+CREATE TABLE conference.proceedings (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    conference_id INTEGER NOT NULL UNIQUE REFERENCES conference.conference(id),
+    name          VARCHAR(250) NOT NULL,
+    year          INTEGER NOT NULL
+);
+
+CREATE TABLE conference.section (
+    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    conference_id INTEGER NOT NULL REFERENCES conference.conference(id),
+    name          VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE conference.building (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE conference.room (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    building_id INTEGER NOT NULL REFERENCES conference.building(id),
+    number      VARCHAR(10) NOT NULL,
+    UNIQUE (building_id, number)
+);
+
+CREATE TABLE conference.session (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    section_id INTEGER NOT NULL REFERENCES conference.section(id),
+    room_id    INTEGER NOT NULL REFERENCES conference.room(id),
+    date       DATE NOT NULL
+);
+
+CREATE TABLE conference.participant (
+    id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name    VARCHAR(150) NOT NULL,
+    organization VARCHAR(200) NOT NULL,
+    email        VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE conference.article (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    conference_id  INTEGER NOT NULL REFERENCES conference.conference(id),
+    proceedings_id INTEGER REFERENCES conference.proceedings(id),
+    title          VARCHAR(300) NOT NULL,
+    pages          INTEGER NOT NULL CHECK (pages > 0)
+);
+
+CREATE TABLE conference.authorship (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    article_id     INTEGER NOT NULL REFERENCES conference.article(id),
+    participant_id INTEGER NOT NULL REFERENCES conference.participant(id),
+    author_order   INTEGER NOT NULL CHECK (author_order > 0),
+    UNIQUE (article_id, participant_id),
+    UNIQUE (article_id, author_order)
+);
+
+CREATE TABLE conference.presentation (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    article_id INTEGER NOT NULL UNIQUE REFERENCES conference.article(id),
+    file       VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE conference.talk (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    article_id     INTEGER NOT NULL UNIQUE REFERENCES conference.article(id),
+    session_id     INTEGER NOT NULL REFERENCES conference.session(id),
+    speaker_id     INTEGER NOT NULL REFERENCES conference.participant(id),
+    start_time     TIME NOT NULL,
+    -- 9:00-17:00, перерыв 12:00-13:00, доклад 30 минут
+    CHECK (start_time >= TIME '09:00' AND start_time <= TIME '16:30'),
+    CHECK (start_time < TIME '11:30' OR start_time >= TIME '13:00'),
+    UNIQUE (session_id, start_time)
+);
+
+---------------------------------------------------------------
+-- 9. Прокат велосипедов
+---------------------------------------------------------------
+CREATE SCHEMA bike_rental;
+
+CREATE TABLE bike_rental.city (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE bike_rental.branch (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    city_id INTEGER NOT NULL REFERENCES bike_rental.city(id),
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE bike_rental.bike_type (
+    id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    brand VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE bike_rental.bike (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    type_id          INTEGER NOT NULL REFERENCES bike_rental.bike_type(id),
+    branch_id        INTEGER NOT NULL REFERENCES bike_rental.branch(id),
+    inventory_number VARCHAR(30) NOT NULL UNIQUE
+);
+
+CREATE TABLE bike_rental.tariff (
+    id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    bike_type_id INTEGER NOT NULL REFERENCES bike_rental.bike_type(id),
+    city_id      INTEGER NOT NULL REFERENCES bike_rental.city(id),
+    hour_cost    NUMERIC(10, 2) NOT NULL CHECK (hour_cost >= 0),
+    UNIQUE (bike_type_id, city_id)
+);
+
+CREATE TABLE bike_rental.client (
+    id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name  VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL UNIQUE
+);
+
+CREATE TABLE bike_rental.payment_method (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    client_id INTEGER NOT NULL REFERENCES bike_rental.client(id),
+    type      VARCHAR(20) NOT NULL CHECK (type IN ('card', 'wallet')),
+    details   VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE bike_rental.rental (
+    id                INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    client_id         INTEGER NOT NULL REFERENCES bike_rental.client(id),
+    bike_id           INTEGER NOT NULL REFERENCES bike_rental.bike(id),
+    payment_method_id INTEGER NOT NULL REFERENCES bike_rental.payment_method(id),
+    tariff_id         INTEGER NOT NULL REFERENCES bike_rental.tariff(id),
+    start_time        TIMESTAMP NOT NULL,
+    end_time          TIMESTAMP,
+    duration_hours    INTEGER CHECK (duration_hours > 0),
+    cost              NUMERIC(10, 2) CHECK (cost >= 0),
+    CHECK (end_time IS NULL OR end_time >= start_time)
+);
+
+---------------------------------------------------------------
+-- 10. Расписание занятий
+---------------------------------------------------------------
+CREATE SCHEMA timetable;
+
+CREATE TABLE timetable.class_slot (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    number     INTEGER NOT NULL UNIQUE CHECK (number > 0),
+    start_time TIME NOT NULL,
+    end_time   TIME NOT NULL,
+    CHECK (end_time > start_time)
+);
+
+CREATE TABLE timetable.weekday (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(20) NOT NULL UNIQUE
+);
+-- допустимые значения: понедельник ... суббота
+INSERT INTO timetable.weekday (name) VALUES
+    ('Понедельник'), ('Вторник'), ('Среда'),
+    ('Четверг'), ('Пятница'), ('Суббота');
+
+CREATE TABLE timetable.lesson_type (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name       VARCHAR(50) NOT NULL UNIQUE,
+    max_groups INTEGER CHECK (max_groups IS NULL OR max_groups > 0)  -- NULL = без ограничения
+);
+INSERT INTO timetable.lesson_type (name, max_groups) VALUES
+    ('Лекция', NULL), ('Семинар', 1);
+
+CREATE TABLE timetable.position (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+INSERT INTO timetable.position (name) VALUES
+    ('Ассистент'), ('Старший преподаватель'), ('Доцент'), ('Профессор');
+
+CREATE TABLE timetable.permission (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    lesson_type_id INTEGER NOT NULL REFERENCES timetable.lesson_type(id),
+    position_id    INTEGER NOT NULL REFERENCES timetable.position(id),
+    UNIQUE (lesson_type_id, position_id)
+);
+-- семинары: все должности; лекции: доцент, профессор
+INSERT INTO timetable.permission (lesson_type_id, position_id)
+SELECT lt.id, p.id
+FROM timetable.lesson_type lt
+JOIN timetable.position p
+  ON lt.name = 'Семинар'
+  OR (lt.name = 'Лекция' AND p.name IN ('Доцент', 'Профессор'));
+
+CREATE TABLE timetable.teacher (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    position_id INTEGER NOT NULL REFERENCES timetable.position(id),
+    full_name   VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE timetable.subject (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE timetable.student_group (
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE timetable.building (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL,
+    address VARCHAR(250) NOT NULL
+);
+
+CREATE TABLE timetable.classroom (
+    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    building_id INTEGER NOT NULL REFERENCES timetable.building(id),
+    number      VARCHAR(10) NOT NULL,
+    capacity    INTEGER NOT NULL CHECK (capacity > 0),
+    UNIQUE (building_id, number)
+);
+
+CREATE TABLE timetable.lesson (
+    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    lesson_type_id INTEGER NOT NULL REFERENCES timetable.lesson_type(id),
+    subject_id     INTEGER NOT NULL REFERENCES timetable.subject(id),
+    teacher_id     INTEGER NOT NULL REFERENCES timetable.teacher(id),
+    classroom_id   INTEGER NOT NULL REFERENCES timetable.classroom(id),
+    slot_id        INTEGER NOT NULL REFERENCES timetable.class_slot(id),
+    weekday_id     INTEGER NOT NULL REFERENCES timetable.weekday(id),
+    UNIQUE (teacher_id, slot_id, weekday_id),
+    UNIQUE (classroom_id, slot_id, weekday_id)
+);
+
+CREATE TABLE timetable.lesson_group (
+    id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    lesson_id INTEGER NOT NULL REFERENCES timetable.lesson(id),
+    group_id  INTEGER NOT NULL REFERENCES timetable.student_group(id),
+    UNIQUE (lesson_id, group_id)
+);
